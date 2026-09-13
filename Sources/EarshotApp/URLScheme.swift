@@ -9,6 +9,7 @@ import EarshotKit
 /// and from other apps, with no extension at all.
 ///
 ///   earshot://dashboard
+///   earshot://preview            (replay the lid-open card)
 ///   earshot://connect?name=AirPods
 ///   earshot://disconnect?name=AirPods
 ///   earshot://toggle?name=AirPods
@@ -19,6 +20,9 @@ import EarshotKit
 final class URLSchemeHandler: NSObject {
     private weak var model: AppModel?
     var onShowDashboard: (() -> Void)?
+    /// Replays the lid-open card on demand. Useful for seeing the animation
+    /// without emptying and refilling a case, and for recording a demo.
+    var onPreviewIsland: ((DeviceState) -> Void)?
 
     init(model: AppModel) {
         self.model = model
@@ -47,6 +51,13 @@ final class URLSchemeHandler: NSObject {
         switch action {
         case "dashboard", "show":
             onShowDashboard?()
+
+        case "preview", "demo":
+            let device = name.flatMap { query in
+                model.devices.first { $0.name.localizedCaseInsensitiveContains(query) }
+            } ?? model.primaryDevice
+                ?? model.devices.first { $0.isPaired && $0.minimumBattery != nil }
+            if let device { onPreviewIsland?(device) }
 
         case "connect", "disconnect", "toggle":
             guard let name, let device = model.devices.first(where: {

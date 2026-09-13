@@ -17,7 +17,7 @@ final class HUDController {
 
         let view = HUDView(device: device)
         let hosting = NSHostingView(rootView: view)
-        hosting.frame = NSRect(x: 0, y: 0, width: 300, height: 168)
+        hosting.frame = NSRect(x: 0, y: 0, width: 320, height: 150)
 
         let panel = self.panel ?? makePanel()
         self.panel = panel
@@ -54,7 +54,7 @@ final class HUDController {
 
     private func makePanel() -> NSPanel {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 168),
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 150),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false)
@@ -85,28 +85,39 @@ final class HUDController {
     }
 }
 
+/// Fallback card for when the island is switched off, or the Mac has no notch
+/// and the user preferred a floating HUD.
 private struct HUDView: View {
     let device: DeviceState
+    @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: device.sfSymbol)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                Text(device.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+        HStack(spacing: 16) {
+            VStack(spacing: 5) {
+                DeviceArt.view(for: device, size: 48, tint: .primary.opacity(0.9))
+                if device.caseBattery != nil {
+                    CaseArt(size: 24, tint: .primary.opacity(0.7), lit: device.caseCharging)
+                }
             }
-            DeviceBatteries(device: device, ringSize: 52)
+            .frame(width: 58)
+            .scaleEffect(appeared ? 1 : 0.85)
+            .opacity(appeared ? 1 : 0)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text(device.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1).truncationMode(.tail)
+                DeviceBatteries(device: device, ringSize: 44)
+            }
+            Spacer(minLength: 0)
         }
         .padding(20)
-        .frame(width: 300, height: 168)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(width: 320, height: 150)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
         )
+        .onAppear { withAnimation(Theme.morph) { appeared = true } }
     }
 }

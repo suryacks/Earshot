@@ -30,11 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // The island is the nicer surface when it is available; the
             // free-floating HUD is the fallback for when it is switched off.
             if self.notch.isEnabled {
-                self.notch.peek(NotchPeek(kind: .lidOpened,
-                                          title: device.name,
-                                          subtitle: nil,
-                                          device: device,
-                                          symbol: "airpodspro"))
+                self.notch.showDevice(device)
             } else {
                 self.hud.show(device: device)
             }
@@ -42,21 +38,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         model.onDeviceConnected = { [weak self] device in
             guard let self, FocusStatus.mayInterrupt else { return }
-            self.notch.peek(NotchPeek(kind: .connected,
-                                      title: device.name,
-                                      subtitle: "Connected",
-                                      device: device,
-                                      symbol: "checkmark.circle.fill"))
+            self.notch.showToast(NotchToast(
+                title: device.name,
+                subtitle: "Connected",
+                symbol: "checkmark.circle.fill",
+                tint: Theme.battery(100),
+                device: device))
         }
 
         model.onDeviceDisconnected = { [weak self] device in
             guard let self, FocusStatus.mayInterrupt else { return }
-            self.notch.peek(NotchPeek(kind: .disconnected,
-                                      title: device.name,
-                                      subtitle: "Disconnected",
-                                      device: nil,
-                                      symbol: "xmark.circle.fill"),
-                            for: 2.0)
+            self.notch.showToast(NotchToast(
+                title: device.name,
+                subtitle: "Disconnected",
+                symbol: "xmark.circle.fill",
+                tint: .white.opacity(0.7)))
         }
 
         NotificationCenter.default.addObserver(
@@ -84,6 +80,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         urlHandler = URLSchemeHandler(model: model)
         urlHandler?.onShowDashboard = { [weak self] in self?.menuBar?.openPopover() }
+        urlHandler?.onPreviewIsland = { [weak self] device in
+            guard let self else { return }
+            if self.notch.isEnabled { self.notch.showDevice(device, for: 5) }
+            else { self.hud.show(device: device) }
+        }
         hotKey = GlobalHotKey { [weak self] in
             MainActor.assumeIsolated { self?.menuBar?.togglePopoverFromHotKey() }
         }

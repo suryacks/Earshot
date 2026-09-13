@@ -80,7 +80,7 @@ final class NotchController {
             geometry: geometry,
             state: state,
             onHover: { [weak self] inside in self?.hoverChanged(inside) },
-            onCollapse: { [weak self] in self?.collapse() })
+            onTap: { [weak self] in self?.tapped() })
 
         if let hosting {
             hosting.rootView = view
@@ -116,19 +116,35 @@ final class NotchController {
         state = .idle
     }
 
-    /// Slides the island out briefly to announce something, then retracts.
-    func peek(_ peek: NotchPeek, for duration: TimeInterval = 3.0) {
-        guard Settings.shared.notchEnabled, Settings.shared.notchSneakPeek else { return }
-        guard isEnabled else { return }
+    /// A tap anywhere on a toast or card expands the island, matching the way
+    /// the phone's island behaves.
+    private func tapped() {
+        guard Settings.shared.notchEnabled else { return }
+        peekTask?.cancel()
+        state = state == .expanded ? .idle : .expanded
+    }
+
+    /// Shows the lid-open card: artwork plus per-cell battery.
+    func showDevice(_ device: DeviceState, for duration: TimeInterval = 4.0) {
+        present(.device(device), for: duration)
+    }
+
+    /// Shows a one-line announcement.
+    func showToast(_ toast: NotchToast, for duration: TimeInterval = 2.6) {
+        present(.toast(toast), for: duration)
+    }
+
+    private func present(_ next: NotchState, for duration: TimeInterval) {
+        guard Settings.shared.notchEnabled, Settings.shared.notchSneakPeek, isEnabled else { return }
         // Never interrupt someone who is actively using the expanded island.
         guard state != .expanded else { return }
 
         peekTask?.cancel()
-        state = .peek(peek)
+        state = next
         peekTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(duration))
-            guard !Task.isCancelled else { return }
-            guard let self, case .peek = self.state else { return }
+            guard !Task.isCancelled, let self else { return }
+            guard self.state == next else { return }
             self.state = .idle
         }
     }

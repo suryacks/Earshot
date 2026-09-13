@@ -98,10 +98,13 @@ enum SelfTest {
         RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.3))
         check("island window created", notch.isEnabled)
         if let device = model.primaryDevice ?? model.devices.first {
-            notch.peek(NotchPeek(kind: .lidOpened, title: device.name, subtitle: "Self-test",
-                                 device: device, symbol: "airpodspro"), for: 0.5)
+            notch.showDevice(device, for: 0.5)
             RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.4))
-            check("sneak peek rendered", true)
+            check("lid-open card rendered", true)
+            notch.showToast(NotchToast(title: device.name, subtitle: "Self-test",
+                                       symbol: "checkmark.circle.fill"), for: 0.4)
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.3))
+            check("toast rendered", true)
         }
         if let geo = NotchGeometry.current() {
             check("screen geometry read", geo.notchSize.width > 0,

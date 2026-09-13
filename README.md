@@ -141,6 +141,7 @@ Shortcuts drives Earshot through its URL scheme — use the **Open URL** action:
 
 ```
 earshot://dashboard
+earshot://preview                 # replay the lid-open card
 earshot://connect?name=AirPods
 earshot://toggle?name=AirPods
 earshot://output?name=MacBook%20Pro%20Speakers
