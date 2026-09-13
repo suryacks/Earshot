@@ -140,3 +140,41 @@ final class BatteryStoreTests: XCTestCase {
         flush()
     }
 }
+
+/// Privacy: devices that aren't paired with this Mac must never reach disk.
+final class BatteryStorePrivacyTests: XCTestCase {
+    private var url: URL!
+    private var store: BatteryStore!
+
+    override func setUpWithError() throws {
+        url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("earshot-privacy-\(UUID().uuidString).sqlite")
+        store = try XCTUnwrap(BatteryStore(url: url))
+    }
+
+    override func tearDownWithError() throws {
+        store = nil
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func testPurgeRemovesUnpairedRowsButKeepsOwnDevices() {
+        var stranger = DeviceState(id: "ble-\(UUID().uuidString)", name: "Someone's AirPods")
+        stranger.left = 50
+        stranger.right = 50
+        var mine = DeviceState(id: "aa:bb:cc:dd:ee:ff", name: "My AirPods")
+        mine.left = 80
+        mine.right = 80
+
+        store.record([stranger, mine])
+        _ = store.history(deviceID: mine.id, since: .distantPast)   // flush
+        XCTAssertEqual(store.history(deviceID: stranger.id, since: .distantPast).count, 1)
+
+        store.purgeUnpairedDevices()
+        _ = store.history(deviceID: mine.id, since: .distantPast)   // flush
+
+        XCTAssertTrue(store.history(deviceID: stranger.id, since: .distantPast).isEmpty,
+                      "a stranger's device must not remain on disk")
+        XCTAssertEqual(store.history(deviceID: mine.id, since: .distantPast).count, 1,
+                       "the user's own device must survive the purge")
+    }
+}

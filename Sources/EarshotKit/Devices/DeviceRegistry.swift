@@ -135,7 +135,10 @@ public final class DeviceRegistry {
         // them against.
         let all = merged + mobileDevices
         devices = all
-        store?.record(all)
+        // Only the user's own devices are persisted. Writing a stranger's
+        // AirPods to disk because they walked past is a privacy problem, and
+        // it fills the history with devices nobody can act on.
+        store?.record(all.filter(\.isPaired))
     }
 
     // MARK: - Queries

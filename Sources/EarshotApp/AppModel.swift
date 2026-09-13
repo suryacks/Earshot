@@ -79,6 +79,7 @@ final class AppModel: ObservableObject {
         }
 
         store?.prune()
+        store?.purgeUnpairedDevices()
     }
 
     func stop() {

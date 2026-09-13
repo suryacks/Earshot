@@ -20,7 +20,21 @@ enum SelfTest {
 
         print("Earshot self-test\n")
 
-        print("Menu bar")
+        print("Bundle")
+        let plist = Bundle.main.infoDictionary ?? [:]
+        check("running from an app bundle", Bundle.main.bundleIdentifier != nil,
+              Bundle.main.bundleIdentifier ?? "no bundle")
+        // Each of these is a hard TCC kill if the app touches the matching API
+        // without the key. A terminal run inherits the terminal's grants and
+        // hides the problem, so it is asserted here rather than discovered by
+        // a user on first launch.
+        for key in ["NSBluetoothAlwaysUsageDescription",
+                    "NSFocusStatusUsageDescription",
+                    "NSAppleEventsUsageDescription"] {
+            check("Info.plist has \(key)", plist[key] != nil)
+        }
+
+        print("\nMenu bar")
         let model = AppModel()
         let menuBar = MenuBarController(model: model)
         let item = menuBar.debugStatusItem

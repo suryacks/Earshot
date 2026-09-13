@@ -163,6 +163,20 @@ public final class BatteryStore {
         return seconds
     }
 
+    /// Removes rows for devices that were never paired with this Mac.
+    ///
+    /// Earlier builds recorded any nearby broadcaster, including ones whose
+    /// payload layout was not actually understood, so existing databases carry
+    /// rows for strangers' devices and for garbage model ids. Those are deleted
+    /// on startup rather than left sitting on disk.
+    public func purgeUnpairedDevices() {
+        queue.async { [weak self] in
+            guard let self, let db = self.db else { return }
+            sqlite3_exec(db, "DELETE FROM readings WHERE device_id LIKE 'ble-%';", nil, nil, nil)
+            self.lastWritten = self.lastWritten.filter { !$0.key.hasPrefix("ble-") }
+        }
+    }
+
     public func prune(olderThan days: Int = 120) {
         let cutoff = Date().addingTimeInterval(-Double(days) * 86_400).timeIntervalSince1970
         queue.async { [weak self] in

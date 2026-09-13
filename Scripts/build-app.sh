@@ -51,6 +51,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <!-- Only used for Now Playing, and only for Music and Spotify. -->
     <key>NSAppleEventsUsageDescription</key>
     <string>Earshot asks Music or Spotify what is playing so it can show it.</string>
+    <!-- Required. Reading Focus status without this key is an instant TCC kill,
+         not a denied request: the app is terminated with SIGABRT on launch. -->
+    <key>NSFocusStatusUsageDescription</key>
+    <string>Earshot checks whether a Focus is active so it can stay quiet instead of sliding out the island.</string>
     <!-- earshot:// URLs, so Shortcuts can drive the app via "Open URL". -->
     <key>CFBundleURLTypes</key>
     <array>
