@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Build
+        run: swift build -v
+
+      # The parser runs against packet fixtures captured from real hardware,
+      # so the suite needs no Bluetooth adapter and passes on CI runners.
+      - name: Test
+        run: swift test
+
+      - name: Assemble app bundle
+        run: ./Scripts/build-app.sh
+
+      - name: Check for build warnings
+        run: |
+          COUNT=$(swift build -c release 2>&1 | grep -c "warning:" || true)
+          echo "warnings: $COUNT"
+          test "$COUNT" -eq 0

@@ -1,5 +1,15 @@
 # Scope
 
+> **Status — v0.1.0 shipped.** Tier A and most of Tier B are implemented and
+> working; the CLI, proximity finder, battery history and per-app audio rules
+> are all in. Not implemented: desktop widgets (needs an Xcode appex target),
+> ANC control and mobile-device battery (both blocked — see FEASIBILITY §9,
+> §10). Shortcuts support landed as a URL scheme rather than App Intents,
+> because SPM cannot build an extension target.
+>
+> This document is kept as the original plan, for comparison against what the
+> build actually cost.
+
 Feature-by-feature plan. Every row is graded by the probe evidence in
 [FEASIBILITY.md](FEASIBILITY.md) — nothing here is graded from intuition.
 

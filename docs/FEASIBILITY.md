@@ -8,6 +8,10 @@ Swift 6.3.1. Probe date: 2026-09-13. Test device: AirPods Pro (model `0x2027`).
 
 ---
 
+> **Status:** every green item below is now shipping in Earshot, and the two
+> open questions have been answered — see §5 (Now Playing, resolved) and §8
+> (private framework, confirmed blocked).
+
 ## GREEN — verified working
 
 ### 1. AirPods battery while disconnected (BLE proximity pairing)
@@ -81,34 +85,37 @@ it. Entirely supported API.
 
 ## YELLOW — works with caveats, or unresolved
 
-### 5. Now Playing — **UNRESOLVED, needs a 10-second test**
+### 5. Now Playing — **RESOLVED: MediaRemote is gated**
 
 `MediaRemote.framework` loads and all four symbols resolve
 (`MRMediaRemoteGetNowPlayingInfo`, `MRMediaRemoteSendCommand`,
 `MRMediaRemoteGetNowPlayingApplicationIsPlaying`,
 `MRNowPlayingClientGetBundleIdentifier`).
 
-`MRMediaRemoteGetNowPlayingInfo` returned an **empty dictionary** — but Spotify
-was *paused* at the time, so this is inconclusive, not a failure. A
-`mediaremoted` log capture produced no entitlement-denial evidence either way.
+The first probe was inconclusive because Spotify happened to be *paused*. Re-run
+later with audio **actually playing**, `MRMediaRemoteGetNowPlayingInfo` still
+returned an empty dictionary. That settles it: Apple's macOS 15.4 restriction is
+still in force on 26.5, and unentitled callers get nothing.
 
-Apple restricted MediaRemote to entitled callers in macOS 15.4, which broke many
-third-party projects, so the prior probability of a block is high.
-
-**To resolve:** start audio playing, then run `research/probes/mediaremote-probe`.
-Non-empty dict → MediaRemote works. Empty → fall back.
-
-**Fallback is proven.** AppleScript returned full track metadata from Spotify
-*even while paused*:
+**The AppleScript fallback is confirmed working** and is what ships. It returns
+full metadata even while paused:
 
 ```
-Kannukulla — Sai Abhyankkar
+Chella Magale — Anirudh Ravichander   (album: Jana Nayagan)
 ```
 
-Per-app AppleScript (Music, Spotify) covers the common cases but needs an
-Automation TCC grant per app and cannot see browser-hosted media. Plan for a
-`NowPlayingSource` protocol with MediaRemote and AppleScript implementations
-behind it, chosen at runtime.
+Two implementation notes paid for in debugging time:
+
+* The callback **must** be declared `@escaping`. MediaRemote answers
+  asynchronously and retains the block; a non-escaping declaration makes Swift
+  free it on return and the later callback lands on freed memory. This crashed
+  reproducibly.
+* AppleScript variable names must dodge reserved tokens. `st` is a date-ordinal
+  abbreviation and fails to parse with a misleading "Expected expression"
+  error.
+
+Coverage: Music and Spotify, via `NowPlayingSource`. Browser-hosted media is not
+reachable without the entitlement.
 
 ### 6. Magic Handoff
 
@@ -116,7 +123,7 @@ Depends on the blocked private path in §8, or on a connect-to-already-paired
 dance via public `IOBluetooth`. The public route likely works but will be
 slower and less seamless than AirBuddy's. Prototype before committing.
 
-### 7. Magic Mouse / Keyboard / Trackpad battery
+### 7. Magic Mouse / Keyboard / Trackpad battery — still untested
 
 **Untested — no such hardware paired to this machine.** The standard route
 (`ioreg -c AppleDeviceManagementHIDEventService` → `BatteryPercent`) returned
