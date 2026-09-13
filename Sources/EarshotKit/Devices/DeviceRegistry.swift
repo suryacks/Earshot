@@ -30,6 +30,8 @@ public final class DeviceRegistry {
     private var adverts: [UUID: BLEObservation] = [:]
     private var pollTimer: Timer?
     private var store: BatteryStore?
+    private let mobile = MobileDeviceStore()
+    private var mobileDevices: [DeviceState] = []
 
     /// Adverts older than this are stale - the device left or went quiet.
     private let advertTTL: TimeInterval = 30
@@ -52,16 +54,40 @@ public final class DeviceRegistry {
         }
         scanner.start()
         refreshProfiled()
+
+        // iCloud can materialise a file without a local write event, so the
+        // watcher is backed up by the same poll timer as system_profiler.
+        mobile.onChange = { [weak self] in self?.refreshMobile() }
+        mobile.startWatching()
+        refreshMobile()
         pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refreshProfiled() }
+            Task { @MainActor in
+                self?.refreshProfiled()
+                self?.refreshMobile()
+            }
         }
     }
 
     public func stop() {
         pollTimer?.invalidate()
         pollTimer = nil
+        mobile.stopWatching()
         scanner.stop()
     }
+
+    /// Companion reports from iPhone/iPad/Watch. Cheap (a few small files), so
+    /// it runs on the main thread.
+    public func refreshMobile() {
+        let fresh = mobile.read()
+        guard fresh != mobileDevices else { return }
+        mobileDevices = fresh
+        rebuild()
+    }
+
+    public var companionDirectory: String { mobile.directoryPath }
+    public var companionConfigured: Bool { mobile.directoryExists }
+    @discardableResult
+    public func createCompanionDirectory() -> Bool { mobile.createDirectory() }
 
     // MARK: - Feeds
 
@@ -104,8 +130,12 @@ public final class DeviceRegistry {
             now: Date(),
             ttl: advertTTL
         )
-        devices = merged
-        store?.record(merged)
+        // Companion reports describe devices this Mac cannot see over Bluetooth,
+        // so they are appended rather than merged - there is nothing to merge
+        // them against.
+        let all = merged + mobileDevices
+        devices = all
+        store?.record(all)
     }
 
     // MARK: - Queries

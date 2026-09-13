@@ -53,7 +53,7 @@ USAGE
   earshot <command> [options]
 
 COMMANDS
-  status [--json]           Battery and connection for every known device
+  status [--json] [--all]   Battery and connection for your devices
   devices [--json]          Alias for status
   connect <name>            Connect a paired Bluetooth device
   disconnect <name>         Disconnect a paired Bluetooth device
@@ -64,11 +64,12 @@ COMMANDS
   nowplaying [--json]       Current track, if any
   find <name>               Live proximity meter for locating a device
   history <name> [--hours N]  Battery history and time-to-empty estimate
-  watch                     Stream BLE adverts as they arrive
+  watch [--raw]             Stream BLE adverts as they arrive
   version                   Print version
 
 OPTIONS
   --json                    Machine-readable output
+  --all                     Also list nearby devices not paired with this Mac
   --scan <seconds>          BLE scan window for status (default 4)
   --no-color                Disable ANSI colour
 
@@ -88,6 +89,11 @@ if let i = args.firstIndex(of: "--scan"), i + 1 < args.count, let v = TimeInterv
     scanSeconds = max(0, min(30, v))
     args.removeSubrange(i...(i + 1))
 }
+let showRaw = args.contains("--raw")
+// Strangers' AirPods are noise by default; --all opts in when you actually
+// want to find something to connect to.
+let showAll = args.contains("--all")
+args.removeAll { $0 == "--raw" || $0 == "--all" }
 var hours = 12.0
 if let i = args.firstIndex(of: "--hours"), i + 1 < args.count, let v = Double(args[i + 1]) {
     hours = max(0.1, min(24 * 30, v))
@@ -117,7 +123,7 @@ func runStatus() {
         printJSON([
             "generated_at": ISO8601DateFormatter().string(from: Date()),
             "bluetooth": String(describing: collector.scannerState()),
-            "devices": devices.map(deviceJSON),
+            "devices": (showAll ? devices : devices.filter(\.isPaired)).map(deviceJSON),
         ])
         return
     }
@@ -134,10 +140,18 @@ func runStatus() {
     let known = devices.filter(\.isPaired)
     let nearby = devices.filter { !$0.isPaired }
     for d in known { print(Format.deviceLine(d)) }
-    if !nearby.isEmpty {
+    if showAll {
+        if nearby.isEmpty {
+            print()
+            print(Format.dim("No unpaired devices broadcasting nearby."))
+        } else {
+            print()
+            print(Format.dim("Nearby, not paired with this Mac:"))
+            for d in nearby { print(Format.deviceLine(d)) }
+        }
+    } else if !nearby.isEmpty {
         print()
-        print(Format.dim("Nearby, not paired with this Mac:"))
-        for d in nearby { print(Format.deviceLine(d)) }
+        print(Format.dim("\(nearby.count) nearby device\(nearby.count == 1 ? "" : "s") hidden — use --all to show"))
     }
 }
 
@@ -213,6 +227,7 @@ func runNowPlaying() {
             "artist": info.artist as Any,
             "album": info.album as Any,
             "app": info.app,
+            "artwork": info.artworkURL?.absoluteString as Any,
         ])
         return
     }
@@ -265,6 +280,9 @@ func runWatch() {
         if let c = m.caseBattery { bits.append("case \(c)%") }
         if m.leftCharging || m.rightCharging || m.caseCharging { bits.append("⚡︎") }
         print("\(Format.dim(time))  \(Format.bold(m.model.name))  \(bits.joined(separator: " "))  \(Format.dim("\(obs.rssi) dBm  lid=\(m.lidCounter)"))")
+        if showRaw {
+            print(Format.dim("             raw: \(m.rawPayload.hexString)  status=0x\(String(format: "%02x", m.rawStatus))"))
+        }
     }
     scanner.onLidOpened = { obs in
         print(Format.c("  ↑ lid opened — \(obs.message.model.name)", "36"))

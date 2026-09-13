@@ -20,6 +20,10 @@ final class Settings {
         static let appRules = "appAudioRules"
         static let appRulesEnabled = "appAudioRulesEnabled"
         static let showNowPlaying = "showNowPlaying"
+        static let showNearbyDevices = "showNearbyDevices"
+        static let notchEnabled = "notchEnabled"
+        static let notchSneakPeek = "notchSneakPeek"
+        static let respectFocus = "respectFocus"
     }
 
     private init() {
@@ -31,6 +35,12 @@ final class Settings {
             Key.inputLockEnabled: false,
             Key.appRulesEnabled: false,
             Key.showNowPlaying: true,
+            // Off by default: a café full of strangers' AirPods is noise, not
+            // information. Turn it on only when you want to connect to something.
+            Key.showNearbyDevices: false,
+            Key.notchEnabled: true,
+            Key.notchSneakPeek: true,
+            Key.respectFocus: true,
         ])
     }
 
@@ -54,6 +64,24 @@ final class Settings {
     var showNowPlaying: Bool {
         get { d.bool(forKey: Key.showNowPlaying) }
         set { d.set(newValue, forKey: Key.showNowPlaying) }
+    }
+    /// Whether to list Apple devices that are broadcasting nearby but are not
+    /// paired with this Mac.
+    var showNearbyDevices: Bool {
+        get { d.bool(forKey: Key.showNearbyDevices) }
+        set { d.set(newValue, forKey: Key.showNearbyDevices) }
+    }
+    var notchEnabled: Bool {
+        get { d.bool(forKey: Key.notchEnabled) }
+        set { d.set(newValue, forKey: Key.notchEnabled) }
+    }
+    var notchSneakPeek: Bool {
+        get { d.bool(forKey: Key.notchSneakPeek) }
+        set { d.set(newValue, forKey: Key.notchSneakPeek) }
+    }
+    var respectFocus: Bool {
+        get { d.bool(forKey: Key.respectFocus) }
+        set { d.set(newValue, forKey: Key.respectFocus) }
     }
     var inputLockEnabled: Bool {
         get { d.bool(forKey: Key.inputLockEnabled) }

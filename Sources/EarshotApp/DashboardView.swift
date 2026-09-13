@@ -56,7 +56,12 @@ struct DashboardView: View {
     }
 
     private var paired: [DeviceState] { model.devices.filter(\.isPaired) }
-    private var nearby: [DeviceState] { model.devices.filter { !$0.isPaired } }
+    private var nearby: [DeviceState] {
+        Settings.shared.showNearbyDevices ? model.devices.filter { !$0.isPaired } : []
+    }
+    private var hiddenNearbyCount: Int {
+        Settings.shared.showNearbyDevices ? 0 : model.devices.filter { !$0.isPaired }.count
+    }
 
     @ViewBuilder
     private var deviceSection: some View {
@@ -80,6 +85,17 @@ struct DashboardView: View {
                 ForEach(nearby) { device in
                     DeviceRow(device: device, model: model)
                 }
+            } else if hiddenNearbyCount > 0 {
+                Button {
+                    Settings.shared.showNearbyDevices = true
+                    model.objectWillChange.send()
+                } label: {
+                    Label("Show \(hiddenNearbyCount) nearby device\(hiddenNearbyCount == 1 ? "" : "s")",
+                          systemImage: "antenna.radiowaves.left.and.right")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
             }
         }
     }

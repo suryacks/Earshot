@@ -1,11 +1,12 @@
 # Earshot
 
-**See your AirPods' battery the moment you open the case — plus a proximity
-finder for when you lose one in the couch.**
+**See your AirPods' battery the moment you open the case — in an interactive
+island that grows out of your MacBook's notch.**
 
 A menu bar app for macOS that reads the battery your AirPods broadcast over
-Bluetooth LE, keeps a history so it can tell you how long they'll actually last,
-and stops macOS hijacking your microphone every time a headset connects.
+Bluetooth LE, shows it in a notch island you can hover and click, keeps a
+history so it can tell you how long they'll actually last, and stops macOS
+hijacking your microphone every time a headset connects.
 
 Free, open source, no telemetry, no account. Built in the spirit of
 [AirBuddy](https://v3.airbuddy.app) — which is excellent, and which you should
@@ -31,6 +32,15 @@ they're connected or not. Earshot listens for that broadcast.
 
 ## Features
 
+**The island**
+- An interactive island in the MacBook notch — hover to expand, click to act
+- Slides out briefly when you open the case, connect, or disconnect, then
+  retracts. Spring-animated, and it stays quiet while a Focus is on
+- Device batteries, connect/disconnect buttons, and Now Playing with album
+  artwork and transport controls, all inside it
+- Notch geometry is measured from the display, so it fits the 14", 16" and Air
+  correctly. Macs without a notch get a floating island below the menu bar
+
 **Battery**
 - Heads-up display when you open the case, before the AirPods connect
 - Left, right and case levels, with charging state
@@ -43,6 +53,14 @@ they're connected or not. Earshot listens for that broadcast.
 - **Proximity finder** — a live hot/cold meter driven by signal strength, for
   locating a bud that's out of the case and not connected. AirBuddy has no
   equivalent, and it's the feature I use most.
+
+**Your devices, not everyone's**
+- Strangers' AirPods broadcast battery to the whole room. Earshot **hides
+  devices that aren't paired with this Mac** by default — you can opt in when
+  you actually want to find something to connect to.
+- **iPhone, iPad and Apple Watch battery** via a companion Shortcut. Apple
+  encrypts what those devices broadcast, so they report it themselves into
+  iCloud Drive. Two-minute setup: [docs/CROSS-DEVICE.md](docs/CROSS-DEVICE.md)
 
 **Audio**
 - One-click output switching from the menu bar
@@ -102,10 +120,11 @@ defaults delete app.earshot.Earshot
 ## The CLI
 
 ```sh
-earshot status              # battery for everything it can see
-earshot status --json       # same, machine-readable
+earshot status              # battery for your devices
+earshot status --all        # include nearby devices you don't own
+earshot status --json       # machine-readable
 earshot find "AirPods Pro"  # live proximity meter
-earshot watch               # stream raw BLE adverts as they arrive
+earshot watch --raw         # stream BLE adverts, with payload hex
 earshot connect "AirPods"   # connect / disconnect / toggle
 earshot output "Speakers"   # switch audio output
 earshot history "AirPods"   # battery curve + time-to-empty
@@ -136,9 +155,9 @@ I'd rather tell you up front than have you find out.
 
 | | Status |
 |---|---|
-| **iPhone / iPad / Watch battery** | **Not supported.** Those Continuity broadcasts are encrypted with keys synced through your iCloud keychain. AirPods are readable only because their battery sits in a *plaintext* prefix; other Apple devices have no equivalent. AirBuddy solves this; Earshot doesn't. |
+| **iPhone / iPad / Watch battery** | **Supported, with setup.** The over-the-air path is closed: Continuity payloads are encrypted, and the Find My cache measures 7.99/8.0 bits of entropy — solid ciphertext. So the device reports its own battery through a Shortcut that writes to iCloud Drive. Readings are as fresh as the automation, not live. [Setup →](docs/CROSS-DEVICE.md) |
 | **ANC / Transparency / Spatial Audio switching** | **Not supported.** Riding on a private L2CAP channel reachable only through `BluetoothManager.framework`, which refuses unsigned clients. Reading the current mode may be possible; setting it isn't. |
-| **Desktop widgets** | **Not implemented.** WidgetKit needs an app-extension target, which Swift Package Manager can't produce. Would require converting to an Xcode project — PRs welcome. |
+| **Desktop widgets** | **Not implemented.** WidgetKit needs an app-extension target, which Swift Package Manager can't produce. The notch island covers most of what I wanted widgets for. Converting to an Xcode project would unlock them — PRs welcome. |
 | **Now Playing for browsers** | **Partial.** Apple gated MediaRemote behind a private entitlement in macOS 15.4, confirmed still gated on 26.5. Earshot falls back to AppleScript, which covers Music and Spotify but not browser tabs. |
 | **Magic Mouse / Keyboard battery** | **Untested** — I don't own any. The code path exists via `system_profiler`. Please report back. |
 
@@ -160,11 +179,18 @@ Battery nibbles are tens of a percent; `0x0F` means *not reported* — which
 Earshot renders as `—`, never as `0%`, because a healthy battery and an unknown
 one are different facts.
 
-Three sources are merged into one device list:
+Four sources are merged into one device list:
 
 - **BLE adverts** — the only battery source while a device is disconnected
 - **`system_profiler`** — authoritative while connected: exact, side-labelled
 - **`IOBluetooth`** — pairing and live connection state
+- **Companion reports** — iPhone/iPad/Watch, via iCloud Drive
+
+Only the 25-byte payload with a model id in Apple's `0x20xx` audio range is
+trusted. A shorter 17-byte variant exists and decodes, under the same offsets,
+to convincing nonsense — one live capture read as *"L 80%, R 20%, lid=15"* from
+bytes that plainly are not those fields, and another produced model `0x8ADF`.
+Both are now rejected rather than shown.
 
 Precedence rules live in
 [`DeviceMerge`](Sources/EarshotKit/Devices/DeviceMerge.swift) as a pure
@@ -178,13 +204,14 @@ live hardware, and it has a regression test.
 this survives OS updates.
 
 Deeper notes: [docs/PROTOCOL.md](docs/PROTOCOL.md) ·
-[docs/FEASIBILITY.md](docs/FEASIBILITY.md)
+[docs/FEASIBILITY.md](docs/FEASIBILITY.md) ·
+[docs/CROSS-DEVICE.md](docs/CROSS-DEVICE.md)
 
 ## Building and testing
 
 ```sh
 swift build              # library, app and CLI
-swift test               # 41 tests, no hardware required
+swift test               # 56 tests, no hardware required
 ./Scripts/build-app.sh   # assemble Earshot.app
 
 # Verifies the real status item, popover, HUD, CoreAudio and BLE stack:
@@ -195,10 +222,10 @@ The test suite runs from packet fixtures captured from real hardware, so the
 parser is testable on any machine — including CI, which has no Bluetooth.
 
 ```
-Sources/EarshotKit    core library — BLE, devices, audio, history (no UI)
-Sources/EarshotApp    menu bar app, HUD, dashboard
+Sources/EarshotKit    core library — BLE, devices, audio, history, mobile (no UI)
+Sources/EarshotApp    menu bar app, notch island, HUD, dashboard
 Sources/EarshotCLI    the earshot command
-Tests/                41 tests
+Tests/                56 tests
 ```
 
 ## Contributing

@@ -27,11 +27,17 @@ final class AppModel: ObservableObject {
     private var nowPlayingTimer: Timer?
 
     var onLidOpened: ((DeviceState) -> Void)?
+    var onDeviceConnected: ((DeviceState) -> Void)?
+    var onDeviceDisconnected: ((DeviceState) -> Void)?
+    /// Previous connection state per device, for detecting transitions.
+    private var connectionState: [String: Bool] = [:]
+    private var seededConnectionState = false
 
     func start() {
         registry.onChange = { [weak self] devices in
             guard let self else { return }
             self.devices = devices
+            self.detectConnectionChanges(devices)
             Notifier.shared.evaluate(devices)
         }
         registry.onScannerStateChange = { [weak self] state in
@@ -81,13 +87,44 @@ final class AppModel: ObservableObject {
         registry.stop()
     }
 
+    /// Emits connect/disconnect events by diffing against the last snapshot.
+    ///
+    /// The first snapshot only seeds the baseline: without that, every device
+    /// already connected at launch would fire a "connected" animation.
+    private func detectConnectionChanges(_ devices: [DeviceState]) {
+        defer {
+            connectionState = Dictionary(devices.map { ($0.id, $0.isConnected) },
+                                         uniquingKeysWith: { a, _ in a })
+            seededConnectionState = true
+        }
+        guard seededConnectionState else { return }
+        for d in devices where d.isPaired {
+            guard let was = connectionState[d.id], was != d.isConnected else { continue }
+            if d.isConnected { onDeviceConnected?(d) } else { onDeviceDisconnected?(d) }
+        }
+    }
+
     func refreshDevices() { registry.refreshProfiled() }
+
+    var companionDirectory: String { registry.companionDirectory }
+    var companionConfigured: Bool { registry.companionConfigured }
+    @discardableResult
+    func createCompanionDirectory() -> Bool { registry.createCompanionDirectory() }
 
     func refreshAudio() {
         outputs = AudioRouter.outputs()
         inputs = AudioRouter.inputs()
         defaultOutputID = AudioRouter.defaultOutput()?.id
         defaultInputID = AudioRouter.defaultInput()?.id
+    }
+
+    func mediaCommand(_ command: MediaControl.Command) {
+        guard MediaControl.send(command, using: nowPlayingResolver) else { return }
+        // Give the player a beat to settle before re-reading, or the UI shows
+        // the pre-command state and looks unresponsive.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            self?.refreshNowPlaying()
+        }
     }
 
     func refreshNowPlaying() {

@@ -24,19 +24,26 @@ public struct AppleScriptMusicSource: NowPlayingSource {
                 set trackName to name of current track
                 set trackArtist to artist of current track
                 set trackAlbum to album of current track
-                return playerState & "\\n" & trackName & "\\n" & trackArtist & "\\n" & trackAlbum
+                set trackArt to ""
+                try
+                    set trackArt to artwork url of current track
+                end try
+                return playerState & "\\n" & trackName & "\\n" & trackArtist & "\\n" & trackAlbum & "\\n" & trackArt
             end if
         end tell
         """
         guard let raw = run(script) else { return nil }
         let parts = raw.components(separatedBy: "\n")
         guard parts.count >= 4, !parts[1].isEmpty else { return nil }
+        // `artwork url` only exists on Spotify, so the field may be absent.
+        let artwork = parts.count >= 5 ? URL(string: parts[4]) : nil
         return NowPlayingInfo(
             title: parts[1],
             artist: parts[2].isEmpty ? nil : parts[2],
             album: parts[3].isEmpty ? nil : parts[3],
             app: app,
-            isPlaying: parts[0].lowercased() == "playing"
+            isPlaying: parts[0].lowercased() == "playing",
+            artworkURL: artwork
         )
     }
 

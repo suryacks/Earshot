@@ -96,6 +96,8 @@ extension DeviceState {
         case .trackpad: return "rectangle.and.hand.point.up.left"
         case .gamepad: return "gamecontroller"
         case .phone: return "iphone"
+        case .tablet: return "ipad"
+        case .watch: return "applewatch"
         case .other: return "dot.radiowaves.left.and.right"
         }
     }

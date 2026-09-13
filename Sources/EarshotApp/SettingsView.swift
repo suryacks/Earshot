@@ -15,6 +15,10 @@ struct SettingsView: View {
     @State private var lockedUID = Settings.shared.inputLockUIDs.first ?? ""
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
+    @State private var showNearby = Settings.shared.showNearbyDevices
+    @State private var notchEnabled = Settings.shared.notchEnabled
+    @State private var notchPeek = Settings.shared.notchSneakPeek
+    @State private var respectFocus = Settings.shared.respectFocus
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -52,6 +56,46 @@ struct SettingsView: View {
                         if let loginItemError {
                             Text(loginItemError).font(.caption).foregroundStyle(.orange)
                         }
+                    }
+
+                    group("Notch island") {
+                        Text("An interactive island at the top of the screen. On Macs without a notch it floats just below the menu bar.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Toggle("Show the island", isOn: $notchEnabled)
+                            .onChange(of: notchEnabled) { _, new in
+                                Settings.shared.notchEnabled = new
+                                NotificationCenter.default.post(name: .earshotNotchSettingChanged, object: nil)
+                            }
+                        Toggle("Slide out for events", isOn: $notchPeek)
+                            .onChange(of: notchPeek) { _, new in Settings.shared.notchSneakPeek = new }
+                            .disabled(!notchEnabled)
+                        Toggle("Stay quiet while a Focus is on", isOn: $respectFocus)
+                            .onChange(of: respectFocus) { _, new in Settings.shared.respectFocus = new }
+                    }
+
+                    group("Other people's devices") {
+                        Text("Apple headphones broadcast battery to everyone in range. Earshot hides devices that are not paired with this Mac.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Toggle("Show nearby devices I don't own", isOn: $showNearby)
+                            .onChange(of: showNearby) { _, new in
+                                Settings.shared.showNearbyDevices = new
+                                model.objectWillChange.send()
+                            }
+                    }
+
+                    group("iPhone, iPad and Apple Watch") {
+                        Text("Apple encrypts the battery those devices broadcast, so they report it themselves with a Shortcut that writes to iCloud Drive.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        LabeledContent("Folder", value: model.companionConfigured ? "Ready" : "Not created")
+                        HStack {
+                            Button("Create folder") { _ = model.createCompanionDirectory() }
+                            Button("Reveal in Finder") {
+                                _ = model.createCompanionDirectory()
+                                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: model.companionDirectory)
+                            }
+                        }
+                        Text("Setup instructions are in the README under \"Cross-device battery\".")
+                            .font(.caption2).foregroundStyle(.tertiary)
                     }
 
                     group("Battery alerts") {
@@ -124,6 +168,7 @@ struct SettingsView: View {
 
 extension Notification.Name {
     static let earshotMenuBarStyleChanged = Notification.Name("earshot.menuBarStyleChanged")
+    static let earshotNotchSettingChanged = Notification.Name("earshot.notchSettingChanged")
 }
 
 /// Launch at login via SMAppService.

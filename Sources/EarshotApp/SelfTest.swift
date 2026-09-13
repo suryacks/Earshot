@@ -78,9 +78,34 @@ enum SelfTest {
             check("HUD", false, "no device to render")
         }
 
+        print("\nNotch island")
+        let notch = NotchController(model: model)
+        notch.enable()
+        RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.3))
+        check("island window created", notch.isEnabled)
+        if let device = model.primaryDevice ?? model.devices.first {
+            notch.peek(NotchPeek(kind: .lidOpened, title: device.name, subtitle: "Self-test",
+                                 device: device, symbol: "airpodspro"), for: 0.5)
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.4))
+            check("sneak peek rendered", true)
+        }
+        if let geo = NotchGeometry.current() {
+            check("screen geometry read", geo.notchSize.width > 0,
+                  "\(geo.hasNotch ? "notch" : "no notch") \(Int(geo.notchSize.width))×\(Int(geo.notchSize.height))")
+        }
+        notch.disable()
+
+        print("\nCompanion devices (iPhone/iPad/Watch)")
+        let mobileStore = MobileDeviceStore()
+        check("drop folder present", mobileStore.directoryExists, mobileStore.directoryPath)
+        let reports = mobileStore.read()
+        check("companion reports readable", true, "\(reports.count) report(s)")
+        for r in reports { print("     • \(r.name) — \(r.displayBattery)") }
+
         print("\nNow Playing")
         let np = NowPlayingResolver().fetch()
         check("resolver ran", true, np.map { "\($0.summary) via \($0.app)" } ?? "nothing playing")
+        check("artwork available", true, np?.artworkURL?.absoluteString ?? "none")
 
         model.stop()
         print("\n\(failures.isEmpty ? "All checks passed." : "FAILED: \(failures.joined(separator: ", "))")")

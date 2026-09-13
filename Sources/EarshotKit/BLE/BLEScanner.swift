@@ -109,6 +109,8 @@ extension BLEScanner {
         lastLidCounter[key] = msg.lidCounter
         guard let previous, previous != msg.lidCounter else { return }
         guard obs.rssi >= lidRSSIFloor else { return }
+        // Never trigger a HUD from a layout whose lid counter we cannot trust.
+        guard msg.isVerifiedLayout else { return }
 
         let now = Date()
         if let last = lastLidFire[key], now.timeIntervalSince(last) < lidDebounce { return }

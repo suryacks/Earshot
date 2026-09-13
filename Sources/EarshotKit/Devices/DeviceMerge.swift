@@ -23,7 +23,11 @@ public enum DeviceMerge {
         ttl: TimeInterval = 30
     ) -> [DeviceState] {
 
-        let fresh = adverts.filter { now.timeIntervalSince($0.date) < ttl }
+        // Unverified layouts are dropped here rather than at the scanner, so
+        // diagnostics (`earshot watch --raw`) can still see them.
+        let fresh = adverts.filter {
+            now.timeIntervalSince($0.date) < ttl && $0.message.isVerifiedLayout
+        }
 
         func nearest(_ productID: UInt16) -> BLEObservation? {
             fresh.filter { $0.message.model.id == productID }.max { $0.rssi < $1.rssi }

@@ -52,3 +52,48 @@ final class BatteryTopologyTests: XCTestCase {
         XCTAssertEqual(d.minimumBattery, 20)
     }
 }
+
+/// Regression tests for garbage devices appearing in the list. A `0x07` message
+/// whose payload is shorter than the verified 25-byte form, or whose model id
+/// is outside Apple's audio range, decodes to convincing but wrong numbers.
+final class LayoutVerificationTests: XCTestCase {
+
+    func testVerifiedLayoutIsAcceptedForRealCapture() throws {
+        let m = try XCTUnwrap(ProximityMessage.parse(hex: ProximityMessageTests.airPodsPro))
+        XCTAssertTrue(m.isVerifiedLayout)
+    }
+
+    /// Observed live: decoded as "L 80%, R 20%, lid=15" from bytes that are
+    /// plainly not those fields.
+    func testShortVariantIsNotTrusted() throws {
+        let m = try XCTUnwrap(ProximityMessage.parse(hex: ProximityMessageTests.shortVariant))
+        XCTAssertFalse(m.isVerifiedLayout,
+                       "the 17-byte form has a different layout and must not be shown as battery")
+    }
+
+    /// Observed live: model 0x8ADF with plausible-looking battery values.
+    func testModelOutsideAppleAudioRangeIsNotTrusted() throws {
+        let hex = "4c00" + "0719" + "01df8a2b998f110009" + String(repeating: "00", count: 16)
+        let m = try XCTUnwrap(ProximityMessage.parse(hex: hex))
+        XCTAssertEqual(m.model.id, 0x8ADF)
+        XCTAssertFalse(m.isVerifiedLayout)
+    }
+
+    func testPlausibleModelRange() {
+        XCTAssertTrue(ProximityMessage.isPlausibleModel(0x2027))
+        XCTAssertTrue(ProximityMessage.isPlausibleModel(0x200F))
+        XCTAssertTrue(ProximityMessage.isPlausibleModel(0x21FF))
+        XCTAssertFalse(ProximityMessage.isPlausibleModel(0x8ADF))
+        XCTAssertFalse(ProximityMessage.isPlausibleModel(0x0000))
+    }
+
+    /// The merge layer is the gate: unverified messages must never reach a device row.
+    func testUnverifiedAdvertsAreExcludedFromMerge() {
+        let hex = "4c00" + "0719" + "01df8a2b998f110009" + String(repeating: "00", count: 16)
+        let msg = ProximityMessage.parse(hex: hex)!
+        let obs = BLEObservation(peripheralID: UUID(), message: msg, rssi: -40, date: Date())
+        let out = DeviceMerge.merge(profiled: [], adverts: [obs],
+                                    connectedAddresses: [], now: Date())
+        XCTAssertTrue(out.isEmpty, "a garbage model id must not create a device row")
+    }
+}

@@ -3,7 +3,7 @@ import Foundation
 /// One audio device as Earshot understands it, merged from every source.
 public struct DeviceState: Sendable, Identifiable, Equatable, Codable {
     public enum Kind: String, Sendable, Codable {
-        case headphones, keyboard, mouse, trackpad, gamepad, phone, other
+        case headphones, keyboard, mouse, trackpad, gamepad, phone, tablet, watch, other
     }
 
     /// Stable across launches: the Bluetooth address when we know it,
@@ -34,6 +34,9 @@ public struct DeviceState: Sendable, Identifiable, Equatable, Codable {
     public var serial: String?
     /// True when battery came from a BLE advert rather than a live connection.
     public var batteryFromAdvert = false
+    /// True when reported by a companion Shortcut on another device, rather
+    /// than read from Bluetooth here.
+    public var isCompanionReport = false
 
     public init(id: String, name: String) {
         self.id = id

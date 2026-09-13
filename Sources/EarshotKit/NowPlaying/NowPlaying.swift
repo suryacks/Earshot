@@ -6,14 +6,19 @@ public struct NowPlayingInfo: Sendable, Equatable, Codable {
     public var album: String?
     public var app: String
     public var isPlaying: Bool
+    /// Album art, when the source can give us one. Spotify exposes a URL over
+    /// AppleScript; Music returns raw image data, which is not worth the
+    /// round-trip here, so it stays nil there.
+    public var artworkURL: URL?
 
     public init(title: String, artist: String? = nil, album: String? = nil,
-                app: String, isPlaying: Bool) {
+                app: String, isPlaying: Bool, artworkURL: URL? = nil) {
         self.title = title
         self.artist = artist
         self.album = album
         self.app = app
         self.isPlaying = isPlaying
+        self.artworkURL = artworkURL
     }
 
     public var summary: String {

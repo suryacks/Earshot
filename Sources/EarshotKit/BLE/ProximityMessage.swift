@@ -26,8 +26,27 @@ public struct ProximityMessage: Sendable, Equatable {
     public let rawStatus: UInt8
     public let rawPayload: Data
 
+    /// True only when the payload matches the layout verified against real
+    /// hardware: the 25-byte form, with a model id in Apple's audio range.
+    ///
+    /// Shorter variants exist - a 17-byte form carrying prefix `0x06` instead
+    /// of `0x01` - and decoding them with the 25-byte field offsets produces
+    /// plausible but wrong numbers (an observed case read as "L 80%, R 20%,
+    /// lid=15" from bytes that plainly are not those fields). Anything that
+    /// fails this check is surfaced for debugging but never shown as battery.
+    public let isVerifiedLayout: Bool
+
     public static let appleCompanyID: UInt16 = 0x004C
     public static let messageType: UInt8 = 0x07
+
+    /// Apple's audio accessories all sit in `0x20xx`. A `0x07` message claiming
+    /// something far outside that range is another device type reusing the
+    /// message, not headphones - one observed advert decoded to model `0x8ADF`
+    /// with convincing-looking battery values. Widen this if a real product
+    /// ever lands outside it.
+    static func isPlausibleModel(_ id: UInt16) -> Bool {
+        (0x2000...0x21FF).contains(id)
+    }
 
     /// Battery nibbles encode tens of a percent; `0x0F` means "not reported".
     /// A missing reading must stay `nil` — rendering it as 0% would tell the
@@ -49,7 +68,8 @@ public struct ProximityMessage: Sendable, Equatable {
         let payload = Array(b.dropFirst(4))
         // Trust the shorter of declared/actual so a truncated frame can't over-read.
         let usable = min(declared, payload.count)
-        // Both observed variants (25- and 17-byte) share this 9-byte prefix.
+        // 9 bytes is the minimum any observed variant carries; the stricter
+        // check for trustworthy data is `isVerifiedLayout` below.
         guard usable >= 9 else { return nil }
         let p = Array(payload.prefix(usable))
 
@@ -106,7 +126,8 @@ public struct ProximityMessage: Sendable, Equatable {
             lidOpen: (lidByte & 0x08) == 0,
             bothInCase: (status & 0x04) == 0 && (status & 0x08) == 0,
             rawStatus: status,
-            rawPayload: Data(p)
+            rawPayload: Data(p),
+            isVerifiedLayout: usable >= 25 && ProximityMessage.isPlausibleModel(modelID)
         )
     }
 
