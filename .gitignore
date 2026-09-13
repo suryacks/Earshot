@@ -1,0 +1,14 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+research/probes/*.o
+# compiled probe binaries (source is tracked, binaries are not)
+research/blescan
+research/probes/coreaudio-probe
+research/probes/bluetoothmanager-probe
+research/probes/mediaremote-probe
+research/probes/iobluetooth-probe
+*.dSYM/
